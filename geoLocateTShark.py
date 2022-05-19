@@ -9,29 +9,43 @@ import sys
 import time
 from datetime import datetime
 import shutil
+import json
 
 interfaceToCaptureOn = "enp5s0"
 
-cmd = f"sudo tshark -i {interfaceToCaptureOn}"
-print(f"----------------------\n Capturing on {interfaceToCaptureOn}.\n----------------------")
-time.sleep(1)
-print(" - Use argument ´-l // --log´ to log to a file. And ´-c // --clear´ to clear logs.")
-process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-time.sleep(2)
-#my_ip = socket.gethostbyname(socket.gethostname())
-
-argument = str(sys.argv[1] if len(sys.argv) > 1 else '.')
+settings = {
+    "log": False,
+    "network_interface": "cH4nG3_tH1S",
+}
 
 globalLogPath = "./logs/globalLogFile.log"
 globalLatestLogPath = "./logs/latest.log"
+global_settings_path = "./settings.json"
 now = datetime.now()
 
-dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+
+def read_from_json(json_path: str):
+    with open(json_path, "r") as json_file:
+        data = json.load(json_file)
+    json_file.close()
+    return data
+
 
 def createGlobalLogFile():
+    # Master Global Log File
     if not os.path.exists(globalLogPath):
         logFile = open(globalLogPath, "a+")
         logFile.close()
+
+    # Json settings file
+    if not os.path.exists(global_settings_path):
+        json_settings = json.dumps(settings)
+
+        with open("settings.json", "w") as jsonfile:
+            jsonfile.write(json_settings)
+        jsonfile.close()
+
+    # Master Global Latest Log File
     if os.path.exists(globalLatestLogPath):
         os.remove(globalLatestLogPath)
     if not os.path.exists(globalLatestLogPath):
@@ -43,6 +57,22 @@ if not os.path.exists('./logs'):
     os.makedirs('./logs')
 
 createGlobalLogFile()
+
+interfaceToCaptureOn = read_from_json("./settings.json")
+
+cmd = f"sudo tshark -i {interfaceToCaptureOn}"
+print(f"----------------------\n Capturing on {interfaceToCaptureOn}.\n----------------------")
+time.sleep(1)
+print(" - Use argument ´-l // --log´ to log to a file. And ´-c // --clear´ to clear logs.")
+process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+time.sleep(2)
+
+# my_ip = socket.gethostbyname(socket.gethostname())
+
+argument = str(sys.argv[1] if len(sys.argv) > 1 else '.')
+
+dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+
 
 def write_to_file(text_to_write, path_to_file, typeOfWrite):
     if os.path.exists(path_to_file):
@@ -68,13 +98,14 @@ def logOutput(msg, logType):
         write_to_file("\n[WARNING] " + msg, globalLogPath, "a+")
         write_to_file("\n[WARNING] " + msg, globalLatestLogPath, "a+")
 
+
 global logging
 
 if argument == "-l" or argument == "--log":
     logging = True
     logOutput("-------------" + dt_string + "-------------", 3)
     write_to_file("-------------" + dt_string + "-------------", globalLatestLogPath, "w")
-    write_to_file(dt_string, globalLatestLogPath, "w") 
+    write_to_file(dt_string, globalLatestLogPath, "w")
     print("\n[ WARNING ] " + "[ Logging to file activated... ]")
     # logOutput("[ Logging to file activated... ]", 3)
 elif argument == "-c" or argument == "--clear":
@@ -97,9 +128,10 @@ if logging:
 
 reader = geolite2.reader()
 
+
 def get_loc(ip):
     location = reader.get(ip)
-    
+
     try:
         country = location["country"]["names"]["en"]
     except:
@@ -108,22 +140,22 @@ def get_loc(ip):
     try:
         subdivision = location["subdivisions"][0]["names"]["en"]
     except:
-        subdivision = "Unknown"    
+        subdivision = "Unknown"
 
     try:
         city = location["city"]["names"]["en"]
     except:
         city = "Unknown"
-    
+
     return country, subdivision, city
 
 
 for line in iter(process.stdout.readline, b""):
-    columns= str(line).split(" ")
+    columns = str(line).split(" ")
 
     if "CLASSIC-STUN" in columns or "classicstun" in columns:
 
-        if "->"  in columns:
+        if "->" in columns:
             src_ip = columns[columns.index("->") - 1]
 
         elif "\\xe2\\x86\\x92" in columns:
